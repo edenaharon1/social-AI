@@ -54,32 +54,126 @@ if (isConfigValid) {
 }
 
 const getSiteVisits = async (req: Request, res: Response): Promise<void> => {
-    if (!isConfigValid || !analyticsData) {
-        console.error("Error inside getSiteVisits: Analytics client not available due to configuration issues.");
-        res.status(500).json({ error: 'Server configuration error preventing Analytics access.' });
+    // Check if user has connected Google Analytics
+    const userId = (req as any).user._id;
+    const user = await User.findById(userId);
+    
+    if (!user?.googleAnalyticsConnected || !user?.googleAnalyticsAccessToken) {
+        console.log(`User ${userId} has not connected Google Analytics or missing access token`);
+        console.log('User GA status:', {
+            connected: user?.googleAnalyticsConnected,
+            hasToken: !!user?.googleAnalyticsAccessToken,
+            hasPropertyId: !!user?.googleAnalyticsPropertyId
+        });
+        res.status(401).json({ error: 'Google Analytics not connected' });
         return;
     }
 
-    console.log(`Requesting GA4 'activeUsers' for property: ${GA4_PROPERTY_ID} for date range: yesterday`);
+    // Use the user's own GA property ID instead of hardcoded service account
+    const userPropertyId = user.googleAnalyticsPropertyId;
+    if (!userPropertyId) {
+        console.error(`User ${userId} has no GA property ID configured`);
+        res.status(400).json({ 
+            error: 'Google Analytics property ID not configured',
+            message: 'Please provide your GA4 Property ID in the settings. You can find this in your Google Analytics account under Admin > Property Settings.',
+            needsPropertyId: true
+        });
+        return;
+    }
+
+    console.log(`Using user's GA property ID: ${userPropertyId}`);
+
+    // Create OAuth2 client with user's access token
+    const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI
+    );
+
+    // Set the user's access token
+    oauth2Client.setCredentials({
+        access_token: user.googleAnalyticsAccessToken,
+        refresh_token: user.googleAnalyticsRefreshToken
+    });
+
+    // Create analytics client with user's credentials
+    const userAnalyticsData = google.analyticsdata({
+        version: 'v1beta',
+        auth: oauth2Client
+    });
+
+    const { postTimestamp } = req.query;
+    let startDate, endDate;
+
+    if (postTimestamp) {
+        // If post timestamp is provided, get visits from that time until now
+        startDate = new Date(postTimestamp as string).toISOString().split('T')[0];
+        endDate = new Date().toISOString().split('T')[0];
+    } else {
+        // Default to last 24 hours
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        startDate = yesterday.toISOString().split('T')[0];
+        endDate = new Date().toISOString().split('T')[0];
+    }
+
+    console.log(`Requesting GA4 data for user property: ${userPropertyId} for date range: ${startDate} to ${endDate}`);
 
     try {
-        const response = await analyticsData.properties.runReport({
-            property: `properties/${GA4_PROPERTY_ID}`,
+        const response = await userAnalyticsData.properties.runReport({
+            property: `properties/${userPropertyId}`,
             requestBody: {
                 dateRanges: [{
-                    startDate: 'yesterday',
-                    endDate: 'yesterday'
+                    startDate,
+                    endDate
                 }],
-                metrics: [{
-                    name: 'activeUsers'
-                }]
+                metrics: [
+                    { name: 'screenPageViews' },
+                    { name: 'newUsers' },
+                    { name: 'eventCount' }
+                ],
+                dimensions: [
+                    { name: 'date' },
+                    { name: 'hour' }
+                ]
             }
         });
 
-        const activeUsers = response.data.rows?.[0]?.metricValues?.[0]?.value || '0';
+        if (!response.data.rows) {
+            console.log('No data returned from GA4');
+            res.json({ 
+                pageViews: 0,
+                newUsers: 0,
+                eventCount: 0,
+                hourlyData: []
+            });
+            return;
+        }
 
-        console.log(`Successfully fetched GA4 data. Active Users (yesterday): ${activeUsers}`);
-        res.json({ visitors: activeUsers });
+        // Process the data
+        const hourlyData = response.data.rows.map((row: any) => ({
+            date: row.dimensionValues[0].value,
+            hour: row.dimensionValues[1].value,
+            pageViews: parseInt(row.metricValues[0].value) || 0,
+            newUsers: parseInt(row.metricValues[1].value) || 0,
+            eventCount: parseInt(row.metricValues[2].value) || 0
+        }));
+
+        // Calculate totals
+        const totals = hourlyData.reduce((acc: any, curr: any) => ({
+            pageViews: acc.pageViews + curr.pageViews,
+            newUsers: acc.newUsers + curr.newUsers,
+            eventCount: acc.eventCount + curr.eventCount
+        }), { pageViews: 0, newUsers: 0, eventCount: 0 });
+
+        console.log(`Successfully fetched GA4 data from user's property. Page Views: ${totals.pageViews}, New Users: ${totals.newUsers}, Events: ${totals.eventCount}`);
+        
+        res.json({ 
+            pageViews: totals.pageViews,
+            newUsers: totals.newUsers,
+            eventCount: totals.eventCount,
+            hourlyData
+        });
 
     } catch (error: any) {
         console.error('Error fetching GA4 data:', error.message);
@@ -134,19 +228,59 @@ const connectGoogleAnalytics = async (req: Request, res: Response): Promise<void
     console.log('Token exchange response:', {
       hasAccessToken: !!tokens.access_token,
       hasRefreshToken: !!tokens.refresh_token,
-      scope: tokens.scope
+      scope: tokens.scope,
+      expiryDate: tokens.expiry_date
     });
 
-    // Store tokens in database
-    await User.findByIdAndUpdate(userId, {
-      googleAnalyticsAccessToken: tokens.access_token,
-      googleAnalyticsRefreshToken: tokens.refresh_token,
-      googleAnalyticsPropertyId: process.env.GOOGLE_ANALYTICS_PROPERTY_ID // Use the property ID from env
+    // Set the tokens to get user's GA properties
+    oauth2Client.setCredentials(tokens);
+
+    // For Google Analytics Data API, we need the user to provide their property ID
+    // The Data API doesn't list properties - it queries data from a specific property
+    // We'll store the tokens and let the user provide their property ID
+    
+    // Find user first to verify they exist
+    const user = await User.findById(userId);
+    if (!user) {
+      console.error('User not found:', userId);
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Store the OAuth tokens for future use with the Data API
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          googleAnalyticsAccessToken: tokens.access_token,
+          googleAnalyticsRefreshToken: tokens.refresh_token,
+          googleAnalyticsPropertyId: null, // User will need to provide this
+          googleAnalyticsConnected: true
+        }
+      },
+      { new: true }
+    );
+
+    console.log('Updated user with GA credentials:', {
+      userId,
+      hasGAToken: !!updatedUser?.googleAnalyticsAccessToken,
+      hasGARefreshToken: !!updatedUser?.googleAnalyticsRefreshToken,
+      gaPropertyId: updatedUser?.googleAnalyticsPropertyId
     });
 
-    res.json({ success: true });
+    res.json({ 
+      success: true,
+      googleAnalyticsConnected: true,
+      message: 'Google Analytics connected successfully. Please provide your GA4 Property ID in settings.',
+      needsPropertyId: true
+    });
   } catch (error: any) {
     console.error('Google Analytics auth error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data
+    });
     res.status(500).json({ 
       error: 'Failed to authenticate with Google Analytics',
       details: error.message 
@@ -154,4 +288,52 @@ const connectGoogleAnalytics = async (req: Request, res: Response): Promise<void
   }
 };
 
-export default { getSiteVisits, connectGoogleAnalytics };
+const updateGoogleAnalyticsPropertyId = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = (req as any).user._id;
+        const { propertyId } = req.body;
+
+        if (!propertyId) {
+            res.status(400).json({ error: 'Property ID is required' });
+            return;
+        }
+
+        // Validate property ID format (GA4 property IDs are numeric strings)
+        if (!/^\d+$/.test(propertyId)) {
+            res.status(400).json({ 
+                error: 'Invalid property ID format',
+                message: 'GA4 Property IDs should be numeric (e.g., 484268560)'
+            });
+            return;
+        }
+
+        // Update user's property ID
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { googleAnalyticsPropertyId: propertyId },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        console.log(`Updated user ${userId} with GA property ID: ${propertyId}`);
+
+        res.json({ 
+            success: true,
+            message: 'Google Analytics property ID updated successfully',
+            propertyId: propertyId
+        });
+
+    } catch (error: any) {
+        console.error('Error updating GA property ID:', error);
+        res.status(500).json({ 
+            error: 'Failed to update Google Analytics property ID',
+            details: error.message 
+        });
+    }
+};
+
+export default { getSiteVisits, connectGoogleAnalytics, updateGoogleAnalyticsPropertyId };

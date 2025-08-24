@@ -15,6 +15,34 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 class UserController {
+    async getConnectionStatus(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userId = (req as any).user._id;
+            console.log('Getting connection status for user:', userId);
+            
+            const user = await UserModel.findById(userId)
+                .select('instagramConnected googleAnalyticsConnected');
+            
+            if (!user) {
+                console.log('User not found for ID:', userId);
+                res.status(404).json({ message: 'User not found' });
+                return;
+            }
+            
+            const connectionStatus = {
+                instagramConnected: user.instagramConnected || false,
+                googleAnalyticsConnected: user.googleAnalyticsConnected || false
+            };
+            
+            console.log('Connection status for user:', userId, connectionStatus);
+            
+            res.status(200).json(connectionStatus);
+        } catch (error: any) {
+            console.error('Error getting connection status:', error);
+            next(error);
+        }
+    }
+
     async getById(req: Request, res: Response, next: NextFunction) {
         try {
             const user = await UserModel.findById(req.params.id)

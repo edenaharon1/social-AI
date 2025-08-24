@@ -111,9 +111,20 @@ router.get("/suggestions", auth, getOrGenerateSuggestions);
 router.put("/suggestions/:suggestionId/refresh", auth, refreshSingleSuggestion);
 
 // מסלול ליצירת הצעות על סמך פרופיל עסקי לפי userId (למקרה שמתבצע מבחוץ עם userId)
-router.get("/suggestions/business/:userId", getOrGenerateSuggestions);
+router.get("/suggestions/business/:userId", auth, getOrGenerateSuggestions);
+
+// Route for current user's Instagram-enhanced suggestions (must come before parameterized route)
+router.get("/suggestions/user/me", auth, async (req, res, next) => {
+  try {
+    const userId = (req as any).user._id;
+    req.params.userId = userId.toString(); // Convert ObjectId to string
+    await getOrGenerateUserSuggestions(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ✅ מסלול להצעות לפי ניתוח פרופיל אינסטגרם של המשתמש
-router.get("/suggestions/user/:userId", getOrGenerateUserSuggestions);
+router.get("/suggestions/user/:userId", auth, getOrGenerateUserSuggestions);
 
 export default router;

@@ -1,2 +1,2 @@
-GET http://aisocial.dev/api/ai/suggestions
+GET https://aisocial.dev/api/ai/suggestions
 Authorization: Bearer 

@@ -15,6 +15,31 @@ const upload = multer({ dest: 'uploads/' });
 
 /**
  * @swagger
+ * /users/me/connections:
+ *   get:
+ *     summary: Get current user's connection status
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User connection status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 instagramConnected:
+ *                   type: boolean
+ *                 googleAnalyticsConnected:
+ *                   type: boolean
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/me/connections', authMiddleware, userController.getConnectionStatus);
+
+/**
+ * @swagger
  * /users:
  *   get:
  *     summary: Get all users

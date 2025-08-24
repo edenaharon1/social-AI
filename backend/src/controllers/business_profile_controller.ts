@@ -1,9 +1,20 @@
 import { Request, Response } from "express";
 import BusinessProfile from "../models/business_profile_model";
 
-const getProfile = async (req: Request, res: Response): Promise<void> => {
+interface AuthRequest extends Request {
+  user?: {
+    _id: string;
+  };
+}
+
+const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const userId = req.params.userId;
+      const userId = (req as AuthRequest).user?._id;
+      if (!userId) {
+        res.status(401).json({ message: "User not authenticated" });
+        return;
+      }
+      
       const profile = await BusinessProfile.findOne({ userId });
   
       if (!profile) {
@@ -17,9 +28,14 @@ const getProfile = async (req: Request, res: Response): Promise<void> => {
     }
   };
   
-const updateProfile = async (req: Request, res: Response) => {
+const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.params.userId;
+    const userId = (req as AuthRequest).user?._id;
+    if (!userId) {
+      res.status(401).json({ message: "User not authenticated" });
+      return;
+    }
+    
     const update = req.body;
 
     const profile = await BusinessProfile.findOneAndUpdate(

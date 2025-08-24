@@ -1,36 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Instagram Authorization</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Authorization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-  <script>
-    const code = new URLSearchParams(window.location.search).get('code');
-    const error = new URLSearchParams(window.location.search).get('error');
-    
-    if (code) {
-      window.opener.postMessage({ 
-        type: 'INSTAGRAM_AUTH', 
-        code 
-      }, window.location.origin);
-    } else if (error) {
-      window.opener.postMessage({ 
-        type: 'INSTAGRAM_AUTH_ERROR', 
-        error 
-      }, window.location.origin);
-    }
-    setTimeout(() => window.close(), 1000);
-  </script>
-  <p>Processing authentication... Please wait.</p>
+    <div class="container">
+        <div class="spinner"></div>
+        <h2>Connecting to Instagram...</h2>
+        <p>Please wait while we complete the authorization.</p>
+    </div>
+
+    <script>
+        // Parse the URL to get the authorization code
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+
+        if (error) {
+            // Handle error
+            window.opener.postMessage({
+                type: 'instagram-callback',
+                error: error
+            }, window.location.origin);
+            window.close();
+        } else if (code) {
+            // Send the code to the parent window
+            window.opener.postMessage({
+                type: 'instagram-callback',
+                code: code
+            }, window.location.origin);
+            
+            // Close this window after a short delay
+            setTimeout(() => {
+                window.close();
+            }, 1000);
+        } else {
+            // No code or error found
+            window.opener.postMessage({
+                type: 'instagram-callback',
+                error: 'No authorization code received'
+            }, window.location.origin);
+            window.close();
+        }
+    </script>
 </body>
 </html>

@@ -61,12 +61,12 @@ const register: RequestHandler = async (req, res) => {
 
         res.status(201).json({
             message: "User registered successfully",
-            user: {
+            RegisteredUser: {
                 username: user.username,
                 email: user.email,
-                _id: user._id,
-                token: token,
+                id: user._id,
             },
+            token: token,
         });
     } catch (err: any) {
         console.error("Error in register:", err);
@@ -96,37 +96,44 @@ const login: RequestHandler = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-        res.status(400).json({ message: "Email and password are required" }); // <--- הוסר return
+        res.status(400).json({ message: "Email and password are required" });
         return;
     }
 
     try {
         const user = await userModel.findOne({ email });
         if (!user) {
-            res.status(400).json({ message: "Invalid credentials" }); // <--- הוסר return
+            res.status(400).json({ message: "Invalid credentials" });
             return;
         };
 
         const validPassword = await bcrypt.compare(password, user.password!);
         if (!validPassword) {
-            res.status(400).json({ message: "Invalid credentials" }); // <--- הוסר return
+            res.status(400).json({ message: "Invalid credentials" });
             return;
         };
 
         if (!process.env.TOKEN_SECRET) {
-            res.status(500).json({ message: "Server Error" }); // <--- הוסר return
+            res.status(500).json({ message: "Server Error" });
             return;
         };
 
         const token = jwt.sign({ _id: user._id }, process.env.TOKEN_SECRET, { expiresIn: process.env.TOKEN_EXPIRATION });
-        res.status(200).json({ // <--- הוסר return
-            username: user.username,
-            email: user.email,
-            _id: user._id,
+        const responseData = {
+            RegisteredUser: {
+                username: user.username,
+                email: user.email,
+                id: user._id
+            },
             token: token,
-        });
+            instagramConnected: user.instagramConnected || false,
+            googleAnalyticsConnected: user.googleAnalyticsConnected || false
+        };
+
+        console.log('Regular login response:', JSON.stringify(responseData, null, 2));
+        res.status(200).json(responseData);
     } catch (err) {
-        res.status(500).json({ message: "Error logging in" }); // <--- הוסר return
+        res.status(500).json({ message: "Error logging in" });
         return;
     }
 };
@@ -135,7 +142,7 @@ const googleLogin: RequestHandler = async (req, res) => {
     const { token } = req.body;
 
     if (!process.env.GOOGLE_CLIENT_ID) {
-        res.status(500).json({ message: "Google Client ID not configured" }); // <--- הוסר return
+        res.status(500).json({ message: "Google Client ID not configured" });
         return;
     }
 
@@ -151,7 +158,7 @@ const googleLogin: RequestHandler = async (req, res) => {
 
         const payload = ticket.getPayload();
         if (!payload || !payload.email) {
-            res.status(400).json({ message: 'Invalid Google token' }); // <--- הוסר return
+            res.status(400).json({ message: 'Invalid Google token' });
             return;
         }
 
@@ -176,7 +183,7 @@ const googleLogin: RequestHandler = async (req, res) => {
         }
 
         if (!process.env.TOKEN_SECRET) {
-            res.status(500).json({ message: "Token secret not configured" }); // <--- הוסר return
+            res.status(500).json({ message: "Token secret not configured" });
             return;
         }
 
@@ -186,15 +193,22 @@ const googleLogin: RequestHandler = async (req, res) => {
             { expiresIn: process.env.TOKEN_EXPIRATION }
         );
 
-        res.status(200).json({ // <--- הוסר return
-            username: user.username,
-            email: user.email,
-            _id: user._id,
+        const responseData = {
+            RegisteredUser: {
+                username: user.username,
+                email: user.email,
+                id: user._id
+            },
             token: jwtToken,
-        });
+            instagramConnected: user.instagramConnected || false,
+            googleAnalyticsConnected: user.googleAnalyticsConnected || false
+        };
+
+        console.log('Google login response:', JSON.stringify(responseData, null, 2));
+        res.status(200).json(responseData);
     } catch (error) {
         console.error('Google login error:', error);
-        res.status(500).json({ message: 'Error logging in with Google' }); // <--- הוסר return
+        res.status(500).json({ message: 'Error logging in with Google' });
         return;
     }
 };

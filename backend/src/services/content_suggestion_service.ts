@@ -109,7 +109,19 @@ Marketing Goals: ${profile.marketingGoals.join(", ")}
 Post Length: ${profile.postLength}
 Use Emojis: ${profile.emojisAllowed ? "Yes" : "No"}, Favorites: ${profile.favoriteEmojis.join(" ")}
 
-Return only a valid JSON array of objects.
+IMPORTANT: Return ONLY a valid JSON array. Do not include any markdown formatting, explanations, or additional text. The response must be parseable JSON.
+
+Example format:
+[
+  {
+    "title": "Example Title",
+    "content": "Example content with emojis 🎉",
+    "hashtags": ["example", "hashtag"],
+    "contentType": "Post"
+  }
+]
+
+Return only the JSON array:
 `;
 
     try {
@@ -121,7 +133,44 @@ Return only a valid JSON array of objects.
         const raw = chatCompletion.choices[0].message?.content ?? "[]";
         console.log("[generateContentBasedOnProfileOnly] Raw AI response:", raw.substring(0, Math.min(raw.length, 500)) + (raw.length > 500 ? '...' : '')); // Log part of the response
 
-        const suggestions = JSON.parse(raw);
+        // Try to clean the response before parsing
+        let cleanedRaw = raw.trim();
+        
+        // Remove any markdown code blocks if present
+        if (cleanedRaw.startsWith('```json')) {
+            cleanedRaw = cleanedRaw.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        } else if (cleanedRaw.startsWith('```')) {
+            cleanedRaw = cleanedRaw.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        }
+
+        let suggestions;
+        try {
+            suggestions = JSON.parse(cleanedRaw);
+        } catch (parseError) {
+            console.error("⚠️ JSON parse error, attempting to fix malformed JSON:", parseError);
+            console.error("Raw response that failed to parse:", raw);
+            
+            // Try to extract JSON from the response using regex
+            const jsonMatch = raw.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                try {
+                    suggestions = JSON.parse(jsonMatch[0]);
+                    console.log("✅ Successfully extracted JSON using regex fallback");
+                } catch (regexError) {
+                    console.error("⚠️ Regex fallback also failed:", regexError);
+                    throw new Error("Unable to parse AI response as valid JSON");
+                }
+            } else {
+                throw new Error("No valid JSON array found in AI response");
+            }
+        }
+
+        // Validate that suggestions is an array
+        if (!Array.isArray(suggestions)) {
+            console.error("⚠️ AI response is not an array:", suggestions);
+            throw new Error("AI response is not a valid array");
+        }
+
         return await generateImagesForSuggestions(profile, suggestions);
     } catch (err: any) {
         console.error("⚠️ Failed to parse AI response (profile only) or AI generation error:", err);
@@ -195,7 +244,19 @@ Based on these top performing Instagram posts by the user:
 ${topPostsSummary}
 ${imageSection}
 
-Return only a valid JSON array of objects.
+IMPORTANT: Return ONLY a valid JSON array. Do not include any markdown formatting, explanations, or additional text. The response must be parseable JSON.
+
+Example format:
+[
+  {
+    "title": "Example Title",
+    "content": "Example content with emojis 🎉",
+    "hashtags": ["example", "hashtag"],
+    "contentType": "Post"
+  }
+]
+
+Return only the JSON array:
 `;
 
     try {
@@ -207,7 +268,44 @@ Return only a valid JSON array of objects.
         const raw = chatCompletion.choices[0].message?.content ?? "[]";
         console.log("[generateContentBasedOnProfileAndInstagram] Raw AI response:", raw.substring(0, Math.min(raw.length, 500)) + (raw.length > 500 ? '...' : '')); // Log part of the response
 
-        const suggestions = JSON.parse(raw);
+        // Try to clean the response before parsing
+        let cleanedRaw = raw.trim();
+        
+        // Remove any markdown code blocks if present
+        if (cleanedRaw.startsWith('```json')) {
+            cleanedRaw = cleanedRaw.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        } else if (cleanedRaw.startsWith('```')) {
+            cleanedRaw = cleanedRaw.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        }
+
+        let suggestions;
+        try {
+            suggestions = JSON.parse(cleanedRaw);
+        } catch (parseError) {
+            console.error("⚠️ JSON parse error, attempting to fix malformed JSON:", parseError);
+            console.error("Raw response that failed to parse:", raw);
+            
+            // Try to extract JSON from the response using regex
+            const jsonMatch = raw.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                try {
+                    suggestions = JSON.parse(jsonMatch[0]);
+                    console.log("✅ Successfully extracted JSON using regex fallback");
+                } catch (regexError) {
+                    console.error("⚠️ Regex fallback also failed:", regexError);
+                    throw new Error("Unable to parse AI response as valid JSON");
+                }
+            } else {
+                throw new Error("No valid JSON array found in AI response");
+            }
+        }
+
+        // Validate that suggestions is an array
+        if (!Array.isArray(suggestions)) {
+            console.error("⚠️ AI response is not an array:", suggestions);
+            throw new Error("AI response is not a valid array");
+        }
+
         return await generateImagesForSuggestions(profile, suggestions);
     } catch (err: any) {
         console.error("⚠️ Failed to parse AI response (profile + instagram) or AI generation error:", err);

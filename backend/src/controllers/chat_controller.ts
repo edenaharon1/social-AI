@@ -1,11 +1,16 @@
-import { Request, Response } from "express";
 import OpenAI from "openai";
+import { Request, Response } from "express";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import axios from "axios";
+import User from "../models/user_model";
+import BusinessProfile from "../models/business_profile_model";
+import InstagramPost from "../models/InstagramPost_model";
 
 dotenv.config();
+
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://aisocial.dev';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -13,7 +18,10 @@ const openai = new OpenAI({
 
 // פונקציה להורדת תמונה ושמירתה בשרת
 async function downloadImageToUploads(imageUrl: string): Promise<string> {
-  const filename = path.basename(new URL(imageUrl).pathname);
+  // Generate a unique filename with timestamp and random string
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const filename = `img-${randomString}.png`;
   const filepath = path.join(process.cwd(), "uploads", filename);
 
   if (fs.existsSync(filepath)) {
@@ -106,6 +114,46 @@ const chatWithAI = async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
+    // Get user context
+    const userId = (req as any).user._id;
+    const user = await User.findById(userId);
+    const businessProfile = await BusinessProfile.findOne({ userId });
+    
+    // Get Instagram context if available
+    let instagramContext = "";
+    if (user?.instagramConnected && user?.instagramAccessToken) {
+      try {
+        const topPosts = await InstagramPost.find({ userId })
+          .sort({ likeCount: -1 })
+          .limit(3)
+          .lean();
+        
+        if (topPosts.length > 0) {
+          instagramContext = `\n\nYour Instagram Performance Context:
+- You have ${topPosts.length} top-performing posts
+- Your best post had ${topPosts[0]?.likeCount || 0} likes and ${topPosts[0]?.commentsCount || 0} comments
+- Your content style: ${topPosts.map(post => post.caption?.substring(0, 50)).join(', ')}...`;
+        }
+      } catch (error) {
+        console.log('Could not fetch Instagram context:', error);
+      }
+    }
+
+    // Build business context
+    let businessContext = "";
+    if (businessProfile) {
+      businessContext = `\n\nYour Business Context:
+- Business Type: ${businessProfile.businessType}
+- Target Audience: ${businessProfile.audienceType}
+- Tone of Voice: ${businessProfile.toneOfVoice}
+- Content Types: ${businessProfile.contentTypes.join(', ')}
+- Marketing Goals: ${businessProfile.marketingGoals.join(', ')}
+- Keywords: ${businessProfile.keywords}
+- Custom Hashtags: ${businessProfile.customHashtags}
+- Emojis Allowed: ${businessProfile.emojisAllowed ? 'Yes' : 'No'}
+- Post Length: ${businessProfile.postLength}`;
+    }
+
     const userContent: any[] = [];
 
     if (message) {
@@ -125,7 +173,7 @@ const chatWithAI = async (req: Request, res: Response): Promise<void> => {
       {
         role: "system",
         content:
-          'את עוזרת אישית יצירתית לרשתות חברתיות. תני מענה קצר וחכם למשתמש. אם יש צורך בתמונות לפוסט, תארי במדויק איזו תמונה יכולה להתאים. למשל: "image: תיאור התמונה."',
+          `את עוזרת אישית יצירתית לרשתות חברתיות. תני מענה קצר וחכם למשתמש. אם יש צורך בתמונות לפוסט, תארי במדויק איזו תמונה יכולה להתאים. למשל: "image: תיאור התמונה."${businessContext}${instagramContext}`,
       },
       {
         role: "user",
@@ -146,9 +194,9 @@ const chatWithAI = async (req: Request, res: Response): Promise<void> => {
 
         if (externalUrl) {
           const savedFilename = await downloadImageToUploads(externalUrl);
-          generatedImageUrl = `http://aisocial.dev/api/uploads/${savedFilename}`;
+          generatedImageUrl = `${PUBLIC_BASE_URL}/api/uploads/${savedFilename}`;
         } else {
-          generatedImageUrl = "http://aisocial.dev/api/uploads/placeholder.png";
+          generatedImageUrl = `${PUBLIC_BASE_URL}/api/uploads/placeholder.png`;
         }
       }
     }
@@ -166,7 +214,7 @@ const uploadImage = (req: Request, res: Response): void => {
     return;
   }
 
-  const imageUrl = `http://aisocial.dev/api/uploads/${req.file.filename}`;
+  const imageUrl = `${PUBLIC_BASE_URL}/api/uploads/${req.file.filename}`;
   res.status(200).json({ imageUrl });
 };
 

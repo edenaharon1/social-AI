@@ -2,6 +2,7 @@ import express from "express";
 import chatController from "../controllers/chat_controller";
 import multer from "multer";
 import path from "path";
+import auth from "../middlewares/authMiddleware";
 
 const router = express.Router();
 
@@ -17,9 +18,9 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // הודעת טקסט
-router.post("/message", chatController.chatWithAI);
+router.post("/", auth, chatController.chatWithAI);
 
 // העלאת תמונה
-router.post("/image", upload.single("image"), chatController.uploadImage);
+router.post("/upload", auth, upload.single("image"), chatController.uploadImage);
 
 export default router;
