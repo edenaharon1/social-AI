@@ -50,6 +50,7 @@ npm install
 npm run dev
 
 **Testing**
+
 This project includes automated tests for the backend. To run them:
 cd backend
 npm test
