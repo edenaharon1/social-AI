@@ -31,7 +31,19 @@ interface AuthRequest extends Request {
 }
 
 /**
- * Fetches the latest Instagram posts (images with captions) for the connected user.
+ * Fetches the latest Instagram posts (images with captions) for the authenticated user.
+ *
+ * Retrieves up to 10 image posts with captions from the Instagram Graph API using the user's
+ * stored access token. Filters for IMAGE media type only and excludes posts without captions.
+ *
+ * @param {AuthRequest} req - Express request with `user._id` from auth middleware
+ * @param {Response} res - Express response
+ * @returns {Promise<void>} Resolves after sending posts array as JSON
+ * @example
+ * GET /api/instagram/posts
+ * // Response: { posts: [{ id, caption, media_url, timestamp }] }
+ *
+ * @throws Returns 401 if Instagram not connected, 500 for API errors
  */
 export const getInstagramPosts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -68,7 +80,22 @@ export const getInstagramPosts = async (req: AuthRequest, res: Response): Promis
 };
 
 /**
- * Uploads an image with caption to Instagram for the connected user.
+ * Uploads an image with caption to Instagram for the authenticated user.
+ *
+ * Accepts an image file and optional caption, converts the image to JPEG format,
+ * creates a media container via Instagram Graph API, and publishes it. Supports
+ * optional scheduled posting by providing `scheduledAt` timestamp.
+ *
+ * @param {AuthRequest} req - Express request with `user._id`, image file, `caption`, and optional `scheduledAt` in body
+ * @param {Response} res - Express response
+ * @returns {Promise<void>} Resolves after posting or scheduling the Instagram post
+ * @example
+ * POST /api/instagram/post
+ * Content-Type: multipart/form-data
+ * { image: File, caption: "...", scheduledAt: "2026-01-20T10:00:00Z" }
+ * // Response: { message: "Posted to Instagram successfully" }
+ *
+ * @throws Returns 400 for missing/invalid image or date, 401 if not connected, 500 for API errors
  */
 export const postToInstagram = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -218,7 +245,20 @@ export const postToInstagram = async (req: AuthRequest, res: Response): Promise<
 };
 
 /**
- * Fetches the most popular Instagram posts for the connected user.
+ * Fetches the most popular Instagram posts for the authenticated user from the last 30 days.
+ *
+ * Retrieves all posts from the past 30 days, calculates engagement (likes + comments),
+ * and returns the top 10 posts sorted by engagement. Handles token expiration by
+ * clearing stored Instagram credentials when the token is invalid.
+ *
+ * @param {AuthRequest} req - Express request with `user._id` from auth middleware
+ * @param {Response} res - Express response
+ * @returns {Promise<void>} Resolves after sending top 10 posts sorted by engagement
+ * @example
+ * GET /api/instagram/popular
+ * // Response: { posts: [{ id, caption, media_url, timestamp, like_count, comments_count }] }
+ *
+ * @throws Returns 401 if not authenticated or token expired, 404 if user not found, 500 for API errors
  */
 export const getPopularInstagramPosts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -301,7 +341,27 @@ export const getPopularInstagramPosts = async (req: AuthRequest, res: Response):
 };
 
 /**
- * Fetches the monthly statistics of Instagram posts for the connected user.
+ * Fetches monthly Instagram statistics for the authenticated user.
+ *
+ * Retrieves all posts from the last 30 days and calculates aggregated metrics including
+ * total posts, likes, comments, averages, and daily breakdown. Provides comprehensive
+ * analytics for tracking Instagram performance over time.
+ *
+ * @param {AuthRequest} req - Express request with `user._id` from auth middleware
+ * @param {Response} res - Express response
+ * @returns {Promise<void>} Resolves after sending monthly statistics as JSON
+ * @example
+ * GET /api/instagram/stats/monthly
+ * // Response: {
+ * //   totalPosts: 20,
+ * //   totalLikes: 500,
+ * //   totalComments: 100,
+ * //   averageLikes: 25,
+ * //   averageComments: 5,
+ * //   dailyStats: [{ date, likes, comments, posts }]
+ * // }
+ *
+ * @throws Returns 401 if not authenticated or Instagram not connected, 404 if user not found, 500 for API errors
  */
 export const getMonthlyStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

@@ -53,6 +53,29 @@ if (isConfigValid) {
     console.error("Google Analytics client NOT initialized due to missing environment variables.");
 }
 
+/**
+ * Fetches GA4 visits/engagement metrics for the authenticated user.
+ *
+ * Validates that the user connected Google Analytics (including OAuth tokens)
+ * and uses the user's GA4 Property ID to run a report via the Analytics Data API
+ * for a given date range (default: last 24 hours or from `postTimestamp`).
+ * Returns overall totals and per-hour breakdown.
+ *
+ * @param {Request} req - Express request (includes `user` id and optional query param `postTimestamp`)
+ * @param {Response} res - Express response object
+ * @returns {Promise<void>} Resolves after sending a JSON response to the client
+ * @example
+ * // Basic request without timestamp
+ * GET /api/analytics/visits
+ * // Response: {
+ * //   "pageViews": 123,
+ * //   "newUsers": 10,
+ * //   "eventCount": 456,
+ * //   "hourlyData": [{ date, hour, pageViews, newUsers, eventCount }]
+ * // }
+ *
+ * @throws May return HTTP errors: 401 (not connected), 400 (missing/invalid Property ID), 500 (server/Google API error)
+ */
 const getSiteVisits = async (req: Request, res: Response): Promise<void> => {
     // Check if user has connected Google Analytics
     const userId = (req as any).user._id;
@@ -192,6 +215,10 @@ const getSiteVisits = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
+/**
+ * Token response structure returned by Google's OAuth flow.
+ * Used for internal documentation purposes only.
+ */
 interface GoogleAnalyticsTokenResponse {
   access_token: string;
   refresh_token: string;
@@ -200,6 +227,21 @@ interface GoogleAnalyticsTokenResponse {
   expiry_date: number;
 }
 
+/**
+ * Connects the user to Google Analytics via OAuth 2.0 and stores tokens in the database.
+ *
+ * Expects `code` (Google authorization code) and `userId` in the request body, exchanges the code for tokens,
+ * stores the tokens for the user, and marks the connection as completed. The user will provide the GA4 Property ID later.
+ *
+ * @param {Request} req - Express request with `code` and `userId` in the body
+ * @param {Response} res - Express response object
+ * @returns {Promise<void>} Resolves after sending a JSON response (success/failure)
+ * @example
+ * POST /api/analytics/connect { code, userId }
+ * // Response: { success: true, googleAnalyticsConnected: true, needsPropertyId: true }
+ *
+ * @throws Returns 400 for missing fields, 404 if user not found, 500 for OAuth/server errors
+ */
 const connectGoogleAnalytics = async (req: Request, res: Response): Promise<void> => {
   const { code, userId } = req.body;
 
@@ -288,6 +330,21 @@ const connectGoogleAnalytics = async (req: Request, res: Response): Promise<void
   }
 };
 
+/**
+ * Updates the user's GA4 Property ID and validates its format.
+ *
+ * Requires a numeric `propertyId` in the request body. Updates the user in the database
+ * and sends a success or appropriate error response.
+ *
+ * @param {Request} req - Express request with `user._id` and `propertyId` in the body
+ * @param {Response} res - Express response object
+ * @returns {Promise<void>} Resolves after sending a response
+ * @example
+ * PUT /api/analytics/property { propertyId: "484268560" }
+ * // Response: { success: true, message: '...updated successfully', propertyId }
+ *
+ * @throws Returns 400 for missing/invalid propertyId, 404 if user not found, 500 for server errors
+ */
 const updateGoogleAnalyticsPropertyId = async (req: Request, res: Response): Promise<void> => {
     try {
         const userId = (req as any).user._id;

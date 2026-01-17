@@ -10,6 +10,22 @@ import { OAuth2Client } from 'google-auth-library';
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // סמן כל פונקציה כ-RequestHandler
+/**
+ * Registers a new user.
+ *
+ * Validates required fields, checks duplicates by email and username,
+ * hashes the password with bcrypt, creates the user, and returns a JWT
+ * along with basic user information.
+ *
+ * @param {Request} req - Express request containing `username`, `email`, `password` in the body
+ * @param {Response} res - Express response object
+ * @returns {Promise<void>} Resolves after sending a JSON response to the client
+ * @example
+ * POST /api/auth/register { username, email, password }
+ * // Response: { message, RegisteredUser: { username, email, id }, token }
+ *
+ * @throws Returns 400 for missing fields, 409 for duplicates, 500 for server/config errors
+ */
 const register: RequestHandler = async (req, res) => {
     const { username, email, password } = req.body;
 
@@ -92,6 +108,22 @@ const register: RequestHandler = async (req, res) => {
     }
 };
 
+/**
+ * Logs in a user with email and password.
+ *
+ * Validates input, checks user existence and password match, creates a JWT,
+ * and returns user information along with external service connection statuses
+ * (Instagram/Google Analytics).
+ *
+ * @param {Request} req - Express request with `email` and `password` in the body
+ * @param {Response} res - Express response object
+ * @returns {Promise<void>} Resolves after sending a JSON response
+ * @example
+ * POST /api/auth/login { email, password }
+ * // Response: { RegisteredUser, token, instagramConnected, googleAnalyticsConnected }
+ *
+ * @throws Returns 400 for invalid input/credentials, 500 for server errors
+ */
 const login: RequestHandler = async (req, res) => {
     const { email, password } = req.body;
 
@@ -138,6 +170,21 @@ const login: RequestHandler = async (req, res) => {
     }
 };
 
+/**
+ * Logs in via Google (OAuth 2.0) using an ID token.
+ *
+ * Verifies the ID token with Google, creates or updates a user by `googleId`/`email`,
+ * and returns a JWT along with user info and connection statuses.
+ *
+ * @param {Request} req - Express request with `token` (Google ID token) in the body
+ * @param {Response} res - Express response object
+ * @returns {Promise<void>} Resolves after sending a JSON response
+ * @example
+ * POST /api/auth/google-login { token }
+ * // Response: { RegisteredUser, token, instagramConnected, googleAnalyticsConnected }
+ *
+ * @throws Returns 400 for invalid token, 500 for Google auth/config errors
+ */
 const googleLogin: RequestHandler = async (req, res) => {
     const { token } = req.body;
 
@@ -213,6 +260,19 @@ const googleLogin: RequestHandler = async (req, res) => {
     }
 };
 
+/**
+ * Stateless logout.
+ *
+ * Does not revoke tokens on the server; simply returns a success message.
+ * The client is responsible for clearing any stored tokens.
+ *
+ * @param {Request} req - Express request
+ * @param {Response} res - Express response
+ * @returns {void} Sends a success message response
+ * @example
+ * POST /api/auth/logout
+ * // Response: { message: "Logged out successfully" }
+ */
 const logout: RequestHandler = (req, res) => {
     res.status(200).json({ message: "Logged out successfully" }); // <--- הוסר return
 };

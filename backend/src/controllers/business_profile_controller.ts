@@ -7,6 +7,19 @@ interface AuthRequest extends Request {
   };
 }
 
+/**
+ * Retrieves the authenticated user's business profile.
+ *
+ * Verifies authentication, fetches the profile by `userId`, and returns it.
+ * Responds with 404 if no profile exists and 401 if unauthenticated.
+ *
+ * @param {AuthRequest} req - Express request with `user._id` populated by auth middleware
+ * @param {Response} res - Express response
+ * @returns {Promise<void>} Resolves after sending JSON response
+ * @example
+ * GET /api/business/profile
+ * // Response: BusinessProfile document
+ */
 const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const userId = (req as AuthRequest).user?._id;
@@ -28,6 +41,19 @@ const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
     }
   };
   
+/**
+ * Creates or updates the authenticated user's business profile.
+ *
+ * Uses `findOneAndUpdate` with `upsert: true` to create the profile if it doesn't exist,
+ * and `runValidators: true` to enforce schema rules. Requires authentication.
+ *
+ * @param {AuthRequest} req - Express request with `user._id` and profile fields in `body`
+ * @param {Response} res - Express response
+ * @returns {Promise<void>} Resolves after sending the updated profile as JSON
+ * @example
+ * PUT /api/business/profile { name, industry, ... }
+ * // Response: Updated BusinessProfile document
+ */
 const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
     const userId = (req as AuthRequest).user?._id;

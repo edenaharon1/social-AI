@@ -1,15 +1,24 @@
 import { Request, Response, NextFunction } from "express";
-import BusinessProfile from "../models/business_profile_model"; // וודא שהנתיב למודל זה נכון
-import ContentSuggestion from "../models/content_suggestion_model"; // וודא שהנתיב למודל זה נכון
+import BusinessProfile from "../models/business_profile_model";
+import ContentSuggestion from "../models/content_suggestion_model";
 import InstagramContentSuggestion from "../models/InstagramContentSuggestion";
-import User from "../models/user_model"; // וודא שהנתיב למודל זה נכון
-import { generateContentFromProfile, fetchAndStoreInstagramPosts } from "../services/content_suggestion_service"; // וודא שהנתיב נכון
+import User from "../models/user_model";
+import { generateContentFromProfile, fetchAndStoreInstagramPosts } from "../services/content_suggestion_service";
 import path from "path";
 import fs from "fs";
 import axios from "axios";
 import mongoose from "mongoose";
 
-// פונקציית עזר: הורדת תמונה ושמירתה בשרת
+/**
+ * Downloads an image from a public URL and saves it to the local `uploads` directory.
+ *
+ * Generates a unique filename, streams the remote content to disk, and returns the saved filename.
+ * If the file already exists (same generated name), returns the existing filename to avoid duplicates.
+ *
+ * @param {string} imageUrl - Public URL of the image to download
+ * @returns {Promise<string>} The saved filename inside the `uploads` folder
+ * @throws Will throw on network or filesystem errors during download/write
+ */
 async function downloadImageToUploads(imageUrl: string): Promise<string> {
     // Generate a unique filename with timestamp and random string
     const timestamp = Date.now();
@@ -42,7 +51,19 @@ async function downloadImageToUploads(imageUrl: string): Promise<string> {
     }
 }
 
-// פונקציית עזר: retry עם backoff
+/**
+ * Executes an async function with retry and exponential backoff on rate-limit errors.
+ *
+ * Retries when the error has HTTP status 429, doubling the delay on each attempt until
+ * the maximum number of retries is reached. Non-429 errors are re-thrown immediately.
+ *
+ * @template T
+ * @param {() => Promise<T>} fn - The async function to execute
+ * @param {number} [retries=3] - Maximum number of retry attempts
+ * @param {number} [delayMs=1000] - Initial delay in milliseconds; doubles on each retry
+ * @returns {Promise<T>} The resolved value from `fn`
+ * @throws Throws after all retries fail or on non-rate-limit errors
+ */
 async function callWithBackoff<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
     for (let i = 0; i <= retries; i++) {
         try {
@@ -62,7 +83,18 @@ async function callWithBackoff<T>(fn: () => Promise<T>, retries = 3, delayMs = 1
     throw new Error("[callWithBackoff] Failed after retries");
 }
 
-// פונקציה: אימות אסימון
+/**
+ * Middleware that validates user authentication and Instagram token presence.
+ *
+ * Checks `req.user._id` format, ensures the user exists, and verifies that the user
+ * has an Instagram access token. Calls `next()` when validation passes, otherwise
+ * responds with the appropriate HTTP error.
+ *
+ * @param {Request} req - Express request, expects `user._id` populated by auth middleware
+ * @param {Response} res - Express response
+ * @param {NextFunction} next - Express next function to continue the middleware chain
+ * @returns {Promise<void>} Resolves after sending a response or calling `next()`
+ */
 const handleTokenAuthentication = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         console.log("Body:", req.body);
@@ -94,7 +126,19 @@ const handleTokenAuthentication = async (req: Request, res: Response, next: Next
 };
 
 /**
- * פונקציה 1: יצירת הצעות תוכן על פי BusinessProfile (userId הוא ObjectId)
+ * Generates or returns existing content suggestions based on the user's BusinessProfile.
+ *
+ * Fetches the authenticated user, checks for existing suggestions, and generates new ones
+ * if fewer than three exist or if the latest suggestions are older than 24 hours. Downloads
+ * images when provided and stores suggestions in the database.
+ *
+ * @param {Request} req - Express request with `user._id` from auth middleware
+ * @param {Response} res - Express response
+ * @param {NextFunction} next - Express next function
+ * @returns {Promise<void>} Resolves after sending suggestions as JSON
+ * @example
+ * GET /api/content/suggestions
+ * // Response: Array of ContentSuggestion documents
  */
 export const getOrGenerateSuggestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     console.log("[getOrGenerateSuggestions] Request received.");
@@ -174,7 +218,18 @@ export const getOrGenerateSuggestions = async (req: Request, res: Response, next
 };
 
 /**
- * פונקציה 2: ריענון הצעה ספציפית לפי BusinessProfile (userId ObjectId)
+ * Refreshes an existing suggestion by generating updated content from the BusinessProfile.
+ *
+ * Finds the user's profile, generates one new content item, optionally replaces image URLs
+ * with locally hosted ones, and updates the specified suggestion as refreshed.
+ *
+ * @param {Request} req - Express request containing `params.suggestionId` and `user._id`
+ * @param {Response} res - Express response
+ * @param {NextFunction} next - Express next function
+ * @returns {Promise<void>} Resolves after returning the updated suggestion
+ * @example
+ * PUT /api/content/suggestions/:suggestionId/refresh
+ * // Response: Updated ContentSuggestion document
  */
 export const refreshSingleSuggestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     console.log("[refreshSingleSuggestion] Request received.");
@@ -196,7 +251,6 @@ export const refreshSingleSuggestion = async (req: Request, res: Response, next:
             return;
         }
 
-        // יוצרים הצעה חדשה אחת
         const [newContent] = await callWithBackoff(() => generateContentFromProfile(profile, undefined, undefined, 1));
         console.log("[refreshSingleSuggestion] AI generated 1 new suggestion for refresh.");
 
@@ -233,7 +287,19 @@ export const refreshSingleSuggestion = async (req: Request, res: Response, next:
 };
 
 /**
- * פונקציה 3: יצירת הצעות תוכן לפי ניתוח אינסטגרם (userId הוא string או ObjectId)
+ * Generates content suggestions for a user based on Instagram analysis.
+ *
+ * Validates `userId`, ensures Instagram connection, deletes outdated/insufficient suggestions,
+ * generates new items using business and Instagram context, saves them, or returns existing ones
+ * if recent and sufficient.
+ *
+ * @param {Request} req - Express request with `params.userId`
+ * @param {Response} res - Express response
+ * @param {NextFunction} next - Express next function
+ * @returns {Promise<void>} Resolves after sending suggestions or errors
+ * @example
+ * GET /api/content/users/:userId/suggestions
+ * // Response: Array of InstagramContentSuggestion documents
  */
 export const getOrGenerateUserSuggestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     console.log("[getOrGenerateUserSuggestions] Request received.");
@@ -272,7 +338,6 @@ export const getOrGenerateUserSuggestions = async (req: Request, res: Response, 
             return;
         }
 
-        // 1. מחפשים הצעות קיימות עבור המשתמש ממקור "userProfile"
         const existingSuggestions = await InstagramContentSuggestion.find({ userId: userIdString, source: "userProfile" })
             .sort({ createdAt: -1 })
             .exec();
@@ -304,7 +369,6 @@ export const getOrGenerateUserSuggestions = async (req: Request, res: Response, 
         if (shouldGenerate) {
             console.log(`[getOrGenerateUserSuggestions] Proceeding to generate new suggestions for userId: ${userIdString}.`);
 
-            // --- בדיקה לפני המחיקה ---
             const countBeforeDelete = await InstagramContentSuggestion.countDocuments({ userId: userIdString, source: "userProfile" });
             console.log(`[getOrGenerateUserSuggestions - Before Delete] Found ${countBeforeDelete} existing Instagram suggestions.`);
 
@@ -336,7 +400,6 @@ export const getOrGenerateUserSuggestions = async (req: Request, res: Response, 
                 }
             }
 
-            // --- בדיקה לפני השמירה ---
             console.log(`[getOrGenerateUserSuggestions - Before Save] Attempting to save ${generated.length} new Instagram suggestions.`);
             if (generated.length > 0) {
                 console.log("[getOrGenerateUserSuggestions - Before Save] First generated item to be saved:", JSON.stringify(generated[0], null, 2));
@@ -359,7 +422,6 @@ export const getOrGenerateUserSuggestions = async (req: Request, res: Response, 
                 res.status(200).json(saved);
             } catch (saveError) {
                 console.error("❌ [getOrGenerateUserSuggestions - ERROR during insertMany]", saveError);
-                // בדוק את סוג השגיאה והצג הודעה מתאימה
                 if (saveError instanceof mongoose.Error.ValidationError) {
                     console.error("MongoDB Validation Error:", saveError.message, saveError.errors);
                     res.status(400).json({ error: "Validation failed during save", details: saveError.message });

@@ -15,6 +15,22 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 class UserController {
+    /**
+     * Retrieves the connection status for Instagram and Google Analytics for the authenticated user.
+     *
+     * Fetches the user's external service connection flags (Instagram and Google Analytics)
+     * and returns them in a JSON response. Used to display connection status in the UI.
+     *
+     * @param {Request} req - Express request with `user._id` from auth middleware
+     * @param {Response} res - Express response
+     * @param {NextFunction} next - Express next function for error handling
+     * @returns {Promise<void>} Resolves after sending connection status as JSON
+     * @example
+     * GET /api/users/connections
+     * // Response: { instagramConnected: true, googleAnalyticsConnected: false }
+     *
+     * @throws Returns 404 if user not found, passes errors to error handler middleware
+     */
     async getConnectionStatus(req: Request, res: Response, next: NextFunction) {
         try {
             const userId = (req as any).user._id;
@@ -43,6 +59,22 @@ class UserController {
         }
     }
 
+    /**
+     * Retrieves a user by their ID with populated posts and comments.
+     *
+     * Fetches a single user document excluding sensitive fields (password, refreshTokens)
+     * and populates related posts and comments for a complete user profile view.
+     *
+     * @param {Request} req - Express request with `params.id` containing the user ID
+     * @param {Response} res - Express response
+     * @param {NextFunction} next - Express next function for error handling
+     * @returns {Promise<void>} Resolves after sending user data as JSON
+     * @example
+     * GET /api/users/:id
+     * // Response: { success: true, data: { _id, username, email, posts, comments, ... } }
+     *
+     * @throws Returns 404 if user not found, passes errors to error handler middleware
+     */
     async getById(req: Request, res: Response, next: NextFunction) {
         try {
             const user = await UserModel.findById(req.params.id)
@@ -64,6 +96,22 @@ class UserController {
         }
     }
 
+    /**
+     * Retrieves all users from the database with populated posts and comments.
+     *
+     * Fetches all user documents excluding sensitive fields (password, refreshTokens)
+     * and populates related posts and comments. Useful for admin panels or user listings.
+     *
+     * @param {Request} req - Express request
+     * @param {Response} res - Express response
+     * @param {NextFunction} next - Express next function for error handling
+     * @returns {Promise<void>} Resolves after sending array of users as JSON
+     * @example
+     * GET /api/users
+     * // Response: { success: true, data: [{ _id, username, email, posts, comments, ... }] }
+     *
+     * @throws Passes errors to error handler middleware
+     */
     async getAllUsers(req: Request, res: Response, next: NextFunction) {
         try {
             const users = await UserModel.find()
@@ -80,6 +128,24 @@ class UserController {
         }
     }
 
+    /**
+     * Updates a user's profile information including username, email, and profile picture.
+     *
+     * Validates that the new username/email are not already in use by other users,
+     * updates the specified fields, and handles optional profile picture upload via multer.
+     *
+     * @param {Request} req - Express request with `params.id`, `body` containing username/email, and optional `file` for profile picture
+     * @param {Response} res - Express response
+     * @param {NextFunction} next - Express next function for error handling
+     * @returns {Promise<void>} Resolves after sending updated user data as JSON
+     * @example
+     * PUT /api/users/:id
+     * Content-Type: multipart/form-data
+     * { username: "newname", email: "new@email.com", profilePicture: File }
+     * // Response: { success: true, data: { _id, username, email, profilePicture, ... } }
+     *
+     * @throws Returns 400 if username/email already in use, 404 if user not found, passes errors to error handler
+     */
     async updateUser(req: Request, res: Response, next: NextFunction) {
         const userId = req.params.id;
         const { username, email } = req.body;
@@ -116,6 +182,21 @@ class UserController {
         }
     }
 
+    /**
+     * Deletes a user from the database by their ID.
+     *
+     * Permanently removes the user document from the database. This action cannot be undone.
+     *
+     * @param {Request} req - Express request with `params.id` containing the user ID to delete
+     * @param {Response} res - Express response
+     * @param {NextFunction} next - Express next function for error handling
+     * @returns {Promise<void>} Resolves after sending deletion confirmation as JSON
+     * @example
+     * DELETE /api/users/:id
+     * // Response: { message: "User deleted successfully" }
+     *
+     * @throws Returns 404 if user not found, passes errors to error handler middleware
+     */
     async deleteUser(req: Request, res: Response, next: NextFunction) {
         const userId = req.params.id;
         try {
