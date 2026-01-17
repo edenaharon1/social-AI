@@ -41,7 +41,7 @@ To get a local copy up and running, follow these simple steps:
 Setup Backend: Go to the backend folder, install dependencies, and create a .env file:
 cd backend
 npm install
-# Add your environment variables to .env
+Add your environment variables to .env
 npm run dev
 
 Setup Frontend: Open a new terminal, go to the frontend folder, and run:
