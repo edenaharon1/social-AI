@@ -22,31 +22,37 @@
 * **Instagram Graph API** for social media connectivity.
 * **Google Auth** for secure user sessions.
 
-##  Getting Started
+### Environment Variables
+To run this project, you will need to add the following variables to your `.env` file in the backend folder:
 
+* `GOOGLE_ANALYTICS_PROPERTY_ID` - Your GA4 Property ID.
+* `GOOGLE_CLIENT_EMAIL` - Service account email for Google APIs.
+* `GOOGLE_PRIVATE_KEY` - Service account private key.
+* `MONGODB_URI` - Connection string for your MongoDB database.
+* `OPENAI_API_KEY` - Your OpenAI API secret key.
+* `INSTAGRAM_APP_ID` - Your Meta/Instagram App ID.
+
+## Getting Started
 To get a local copy up and running, follow these simple steps:
 
-1. **Clone the repository:**
-   ```bash
+ **Clone the repository:**
    git clone [https://github.com/edenaharon1/social-AI.git](https://github.com/edenaharon1/social-AI.git)
-Install dependencies: Enter both client and server folders and run:
 
-Bash
-
+Setup Backend: Go to the backend folder, install dependencies, and create a .env file:
+cd backend
 npm install
-Environment Variables: Create a .env file in the server folder and add your credentials:
+# Add your environment variables to .env
+npm run dev
 
-MONGODB_URI
+Setup Frontend: Open a new terminal, go to the frontend folder, and run:
+cd frontend
+npm install
+npm run dev
 
-OPENAI_API_KEY
-
-GOOGLE_CLIENT_ID
-
-INSTAGRAM_APP_ID
-
-Run the application:
-Bash
-npm start
+**Testing**
+This project includes automated tests for the backend. To run them:
+cd backend
+npm test
 
 Project Structure & My Contribution
 This was a collaborative final project. My primary focus included:
