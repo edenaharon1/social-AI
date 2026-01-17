@@ -60,13 +60,13 @@ const register: RequestHandler = async (req, res) => {
         // ודא שהמשתמש נוצר בהצלחה לפני יצירת טוקן
         if (!user) { // זה אמור לקרות רק אם יש בעיה פנימית ב-Mongoose שאינה נזרקת כ-error
              res.status(500).json({ message: "Failed to create user." });
-             return; // <--- הוספת return כדי למנוע המשך ביצוע הקוד
+             return; 
         }
 
         if (!process.env.TOKEN_SECRET) {
             console.error("TOKEN_SECRET environment variable is not defined for register function.");
              res.status(500).json({ message: "Server configuration error (TOKEN_SECRET missing)" });
-             return; // <--- הוספת return כדי למנוע המשך ביצוע הקוד
+             return; 
         }
 
         const token = jwt.sign(
@@ -94,7 +94,7 @@ const register: RequestHandler = async (req, res) => {
             }
             if (err.keyPattern && err.keyPattern.username) {
                  res.status(409).json({ message: "Username already exists." });
-                 return; // <--- הוספת return כדי למנוע המשך ביצוע הקוד
+                 return; 
             }
         }
         // טיפול בשגיאות אחרות (לדוגמה, שגיאות ולידציה של Mongoose)

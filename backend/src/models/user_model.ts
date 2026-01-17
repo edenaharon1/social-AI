@@ -11,7 +11,7 @@ export interface IUser extends Document {
   profilePicture?: string;
   instagramAccessToken?: string;
   instagramUserId?: string;
-  instagramConnected?: boolean; // Add this field
+  instagramConnected?: boolean; 
   googleAnalyticsAccessToken?: string;
   googleAnalyticsRefreshToken?: string;
   googleAnalyticsPropertyId?: string;
@@ -29,7 +29,7 @@ const userSchema = new Schema<IUser>({
   profilePicture: { type: String, default: '' },
   instagramAccessToken: { type: String, default: null },
   instagramUserId: { type: String, default: null },
-  instagramConnected: { type: Boolean, default: false }, // Add this field
+  instagramConnected: { type: Boolean, default: false }, 
   googleAnalyticsAccessToken: { type: String, default: '' },
   googleAnalyticsRefreshToken: { type: String, default: '' },
   googleAnalyticsPropertyId: { type: String, default: '' },

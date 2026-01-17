@@ -4,18 +4,18 @@ export interface IBusinessProfile extends Document {
   userId: mongoose.Types.ObjectId;
   businessName: string;
   businessType: string;
-  platforms: string[]; // "Instagram", "Website"
-  contentTypes: string[]; // "Posts", "Stories", "Reels", "Newsletter"
+  platforms: string[];
+  contentTypes: string[];
   marketingGoals: string[];
-  audienceType: string; // text field up to 1 sentence
-  toneOfVoice: string; // "Friendly", "Professional", etc.
+  audienceType: string;
+  toneOfVoice: string;
   postLength: "short" | "medium" | "long";
-  mainColors: string[]; // up to 5 hex colors
+  mainColors: string[];
   emojisAllowed: boolean;
-  favoriteEmojis: string[]; // up to 7 emojis
+  favoriteEmojis: string[];
   hashtagsStyle: "none" | "fewRelevant" | "manyForReach";
-  keywords: string; // free text
-  customHashtags: string; // free text
+  keywords: string;
+  customHashtags: string;
 }
 
 const BusinessProfileSchema: Schema<IBusinessProfile> = new Schema({

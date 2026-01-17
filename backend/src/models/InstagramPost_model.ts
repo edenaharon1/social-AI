@@ -3,14 +3,14 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IInstagramPost extends Document {
   userId: string;
-  instagramId: string; // <-- שנה את זה מ-postId ל-instagramId
+  instagramId: string; 
   caption: string;
   mediaType: string;
   mediaUrl: string;
   timestamp: Date;
   likeCount: number;
   commentsCount: number;
-  // ... ודא ששדות אחרים מוגדרים כהלכה לפי הצורך
+
 }
 
 const InstagramPostSchema: Schema = new Schema({
@@ -22,7 +22,7 @@ const InstagramPostSchema: Schema = new Schema({
   timestamp: { type: Date },
   likeCount: { type: Number, default: 0 },
   commentsCount: { type: Number, default: 0 },
-  // ... ודא ששדות אחרים תואמים לשימוש המיועד שלך
+ 
   content: { type: String },
   contentType: { type: String, enum: ["Post", "Story", "Reel"], default: "Post" },
   imageUrls: [String],

@@ -9,8 +9,18 @@ const openai = new OpenAI({
 
 /**
  * Fetches Instagram posts for a given user and stores them in the database.
- * @param userId The ID of the user (from your system, typically MongoDB ObjectId string).
- * @param accessToken The Instagram access token for the user.
+ *
+ * Retrieves media data from the Instagram Graph API including captions, media types,
+ * URLs, timestamps, likes, and comments. Stores new posts in MongoDB, skipping duplicates.
+ * Maps Instagram fields to the application's schema and extracts hashtags from captions.
+ *
+ * @param {string} userId - The user ID from the application's database (MongoDB ObjectId string)
+ * @param {string} accessToken - Instagram access token for API authentication
+ * @returns {Promise<void>} Resolves after fetching and storing posts
+ * @throws Will throw if Instagram API returns an error or if database operations fail
+ *
+ * @example
+ * await fetchAndStoreInstagramPosts('507f1f77bcf86cd799439011', 'IGQVJ...');
  */
 export async function fetchAndStoreInstagramPosts(userId: string, accessToken: string): Promise<void> {
     try {
@@ -88,7 +98,22 @@ export async function fetchAndStoreInstagramPosts(userId: string, accessToken: s
     }
 }
 
-// Function to generate content based on profile only (form data)
+/**
+ * Generates social media content suggestions based solely on the business profile.
+ *
+ * Uses OpenAI GPT-4 to create content suggestions tailored to the business type, tone,
+ * audience, and marketing goals. Does not use Instagram data. Generates images for each
+ * suggestion using DALL-E. Handles JSON parsing with fallback mechanisms for malformed responses.
+ *
+ * @param {IBusinessProfile} profile - Business profile containing preferences and settings
+ * @param {number} count - Number of content suggestions to generate
+ * @returns {Promise<any[]>} Array of content suggestions with titles, content, hashtags, and image URLs
+ * @throws Will throw if OpenAI API fails or if response cannot be parsed
+ *
+ * @example
+ * const suggestions = await generateContentBasedOnProfileOnly(profile, 3);
+ * // Returns: [{ title, content, hashtags, contentType, imageUrls }, ...]
+ */
 async function generateContentBasedOnProfileOnly(
     profile: IBusinessProfile,
     count: number
@@ -184,7 +209,26 @@ Return only the JSON array:
     }
 }
 
-// Function to generate content based on Instagram data + profile
+/**
+ * Generates social media content suggestions based on business profile and Instagram performance data.
+ *
+ * Retrieves top-performing Instagram posts by engagement, analyzes their patterns, and uses this
+ * data along with the business profile to generate AI-powered content suggestions. Optionally updates
+ * Instagram posts before generating suggestions. Uses OpenAI GPT-4 for content and DALL-E for images.
+ *
+ * @param {IBusinessProfile} profile - Business profile containing preferences and settings
+ * @param {string} userId - Application user ID for fetching Instagram posts from database
+ * @param {string} accessToken - Instagram access token for API authentication
+ * @param {number} count - Number of content suggestions to generate
+ * @param {boolean} updateInstagramPosts - Whether to fetch fresh Instagram data before generating
+ * @returns {Promise<any[]>} Array of content suggestions with titles, content, hashtags, and image URLs
+ * @throws Will throw if Instagram API, OpenAI API, or database operations fail
+ *
+ * @example
+ * const suggestions = await generateContentBasedOnProfileAndInstagram(
+ *   profile, '507f1f77bcf86cd799439011', 'IGQVJ...', 3, true
+ * );
+ */
 async function generateContentBasedOnProfileAndInstagram(
     profile: IBusinessProfile,
     userId: string,
@@ -319,7 +363,22 @@ Return only the JSON array:
     }
 }
 
-// Helper function for generating images for each suggestion
+/**
+ * Generates images for content suggestions using OpenAI DALL-E.
+ *
+ * Creates image prompts based on business type and suggestion titles, then generates
+ * images via DALL-E API. Validates content types and handles image generation failures
+ * gracefully by returning empty arrays. Each suggestion receives up to 2 images.
+ *
+ * @param {IBusinessProfile} profile - Business profile containing business type for image prompts
+ * @param {any[]} suggestions - Array of content suggestions to generate images for
+ * @returns {Promise<any[]>} Same suggestions array with imageUrls field populated
+ * @throws Does not throw; handles errors by setting empty imageUrls arrays
+ *
+ * @example
+ * const withImages = await generateImagesForSuggestions(profile, suggestions);
+ * // Each suggestion now has imageUrls: [url1, url2] or []
+ */
 async function generateImagesForSuggestions(profile: IBusinessProfile, suggestions: any[]): Promise<any[]> {
     const validTypes = ["Post", "Story", "Reel", "Newsletter"];
 
@@ -361,7 +420,31 @@ async function generateImagesForSuggestions(profile: IBusinessProfile, suggestio
     return suggestions;
 }
 
-// The main exported function - routes to the two logics based on parameters
+/**
+ * Main function to generate social media content suggestions.
+ *
+ * Routes to either profile-only or profile+Instagram generation logic based on provided parameters.
+ * If userId and accessToken are provided, uses Instagram performance data to inform suggestions.
+ * Otherwise, generates suggestions based solely on business profile data.
+ *
+ * @param {IBusinessProfile} profile - Business profile containing preferences and settings
+ * @param {string} [userId] - Optional user ID for fetching Instagram posts
+ * @param {string} [accessToken] - Optional Instagram access token
+ * @param {number} [count=3] - Number of content suggestions to generate (default: 3)
+ * @param {boolean} [updateInstagramPosts=false] - Whether to fetch fresh Instagram data before generating
+ * @returns {Promise<any[]>} Array of content suggestions with titles, content, hashtags, contentType, and imageUrls
+ * @throws Will throw if underlying API calls or database operations fail
+ *
+ * @example
+ * // Generate without Instagram data
+ * const suggestions = await generateContentFromProfile(profile);
+ *
+ * @example
+ * // Generate with Instagram data
+ * const suggestions = await generateContentFromProfile(
+ *   profile, userId, accessToken, 5, true
+ * );
+ */
 export async function generateContentFromProfile(
     profile: IBusinessProfile,
     userId?: string,

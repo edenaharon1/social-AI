@@ -42,7 +42,7 @@ const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   };
   
 /**
- * Creates or updates the authenticated user's business profile.
+ *  updates the authenticated user's business profile.
  *
  * Uses `findOneAndUpdate` with `upsert: true` to create the profile if it doesn't exist,
  * and `runValidators: true` to enforce schema rules. Requires authentication.

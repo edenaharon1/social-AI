@@ -3,11 +3,11 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface InstagramContentSuggestionDoc extends Document {
     userId: string;
     content: string;
-    title?: string; // הוספתי שדות חסרים בהתבסס על מה שה-AI מחזיר
+    title?: string; 
     hashtags?: string[];
     contentType?: string;
     imageUrls: string[];
-    source: string; // לדוגמה: "instagramProfile"
+    source: string; 
     createdAt: Date;
     refreshed: boolean;
 }
